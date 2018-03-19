@@ -15,7 +15,7 @@
 apiVersion: v1
 kind: List
 items:
-- apiVersion: extensions/v1beta1
+- apiVersion: apps/v1
   kind: Deployment
   metadata:
     name: jaeger-collector
@@ -24,8 +24,10 @@ items:
       jaeger-infra: collector-deployment
   spec:
     replicas: 1
-    strategy:
-      type: Recreate
+    selector:
+      matchLabels:
+        app: jaeger
+        jaeger-infra: collector-pod
     template:
       metadata:
         labels:
@@ -101,7 +103,7 @@ items:
     selector:
       jaeger-infra: collector-pod
     type: ClusterIP
-- apiVersion: extensions/v1beta1
+- apiVersion: apps/v1
   kind: Deployment
   metadata:
     name: jaeger-query
@@ -110,6 +112,10 @@ items:
       jaeger-infra: query-deployment
   spec:
     replicas: 1
+    selector:
+      matchLabels:
+        app: jaeger
+        jaeger-infra: query-pod
     strategy:
       type: Recreate
     template:
@@ -162,4 +168,69 @@ items:
       targetPort: 16686
     selector:
       jaeger-infra: query-pod
+    type: LoadBalancer
+- apiVersion: apps/v1
+  kind: DaemonSet
+  metadata:
+    name: jaeger-agent
+    labels:
+      app: jaeger
+      jaeger-infra: agent-daemonset
+  spec:
+    selector:
+      matchLabels:
+        app: jaeger
+        jaeger-infra: agent-instance
+    template:
+      metadata:
+        labels:
+          app: jaeger
+          jaeger-infra: agent-instance
+      spec:
+        containers:
+        - name: agent-instance
+          image: jaegertracing/jaeger-agent:1.2
+          command:
+          - "/go/bin/agent-linux"
+          - "--config-file=/conf/agent.yaml"
+          volumeMounts:
+          - name: jaeger-configuration-volume
+            mountPath: /conf
+          ports:
+          - containerPort: 5775
+            protocol: UDP
+          - containerPort: 6831
+            protocol: UDP
+          - containerPort: 6832
+            protocol: UDP
+        volumes:
+          - configMap:
+              name: jaeger-configuration
+              items:
+                - key: agent
+                  path: agent.yaml
+            name: jaeger-configuration-volume
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: jaeger-agent
+    labels:
+      app: jaeger
+      jaeger-infra: agent-service
+  spec:
+    ports:
+    - name: zipkin-compact
+      port: 5775
+      protocol: UDP
+      targetPort: 5775
+    - name: jaeger-compact
+      port: 6831
+      protocol: UDP
+      targetPort: 6831
+    - name: jaeger-binary
+      port: 6832
+      protocol: UDP
+      targetPort: 6832
+    selector:
+      jaeger-infra: agent-instance
     type: LoadBalancer

@@ -52,7 +52,8 @@ If changes are required for the configuration, the `edit` command can be used:
 
 ### Jaeger components
 
-The main production template deploys the Collector and the Query Service (with UI) as separate individually scalable services.
+The main production template deploys the Collector and the Query Service (with UI) as separate individually scalable services,
+as well as the Agent as `DaemonSet`.
 
     kubectl create -f https://raw.githubusercontent.com/jaegertracing/jaeger-kubernetes/master/jaeger-production-template.yml
 
@@ -64,18 +65,24 @@ Once everything is ready, `kubectl get service jaeger-query` tells you where to 
 
 ### Deploying the agent as sidecar
 The Jaeger Agent is designed to be deployed local to your service, so that it can receive traces via UDP keeping your
-application's load minimal. As such, it's ideal to have the Agent to be deployed as a sidecar to your application's component,
-just add it as a container within any struct that supports `spec.containers`, like a `Pod`, `Deployment` and so on.
+application's load minimal. By default, the template above installs the agent as a `DaemonSet`, but this means that all
+pods running on a given node will send data to the same agent. If that's not suitable for your workload, an alternative
+is to deploy the agent as a sidecar. To accomplish that, just add it as a container within any struct that supports 
+`spec.containers`, like a `Pod`, `Deployment` and so on. More about this be found on the blog post 
+[Deployment strategies for the Jaeger Agent](https://medium.com/jaegertracing/deployment-strategies-for-the-jaeger-agent-1d6f91796d09).
 
-For instance, assuming that your application is named `myapp` and the image is for it is `mynamespace/hello-myimage`, your
+Assuming that your application is named `myapp` and the image is for it is `mynamespace/hello-myimage`, your
 `Deployment` descriptor would be something like:
 
 ```yaml
-- apiVersion: extensions/v1beta1
+- apiVersion: apps/v1
   kind: Deployment
   metadata:
     name: myapp
   spec:
+    selector:
+      matchLabels:
+        app: myapp
     template:
       metadata:
         labels:
