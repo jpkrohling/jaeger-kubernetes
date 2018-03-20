@@ -203,6 +203,7 @@ items:
             protocol: UDP
           - containerPort: 6832
             protocol: UDP
+        hostNetwork: true
         volumes:
           - configMap:
               name: jaeger-configuration
@@ -210,27 +211,3 @@ items:
                 - key: agent
                   path: agent.yaml
             name: jaeger-configuration-volume
-- apiVersion: v1
-  kind: Service
-  metadata:
-    name: jaeger-agent
-    labels:
-      app: jaeger
-      jaeger-infra: agent-service
-  spec:
-    ports:
-    - name: zipkin-compact
-      port: 5775
-      protocol: UDP
-      targetPort: 5775
-    - name: jaeger-compact
-      port: 6831
-      protocol: UDP
-      targetPort: 6831
-    - name: jaeger-binary
-      port: 6832
-      protocol: UDP
-      targetPort: 6832
-    selector:
-      jaeger-infra: agent-instance
-    type: LoadBalancer
